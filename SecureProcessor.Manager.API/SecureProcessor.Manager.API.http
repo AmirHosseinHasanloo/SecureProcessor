@@ -1,0 +1,6 @@
+@SecureProcessor.Manager.API_HostAddress = http://localhost:5096
+
+GET {{SecureProcessor.Manager.API_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
