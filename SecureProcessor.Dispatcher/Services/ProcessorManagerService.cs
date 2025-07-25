@@ -1,6 +1,7 @@
 ﻿
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
+using SecureProcessor.Shared.Models;
 using System;
 using System.Collections.Generic;
 using System.Configuration;
@@ -20,13 +21,7 @@ namespace SecureProcessor.Dispatcher.Services
         private readonly ILogger<ProcessorManagerService> _logger;
         private readonly int _maxActiveProcessors;
 
-        private class ProcessorInfo
-        {
-            public string Id { get; set; }
-            public string Type { get; set; }
-            public bool IsActive { get; set; }
-            public DateTime LastActivity { get; set; }
-        }
+      
 
         public ProcessorManagerService(ILogger<ProcessorManagerService> logger, IConfiguration configuration)
         {

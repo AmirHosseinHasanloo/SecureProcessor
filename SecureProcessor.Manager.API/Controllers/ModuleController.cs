@@ -106,10 +106,10 @@ namespace SecureProcessor.Manager.API.Controllers
 
                 // منطق واقعی بررسی سلامت سیستم
                 bool isEnabled = true;
-                int activeClients = Math.Min(_connectedClients, 10); // حداکثر 10 کلاینت
+                int activeClients = Math.Min(_connectedClients, 5); // حداکثر 5 کلاینت
                 DateTime expirationTime = DateTime.UtcNow.AddMinutes(10);
 
-                _logger.LogInformation($"   Configured Max Active Clients: 10");
+                _logger.LogInformation($"   Configured Max Active Clients: 5");
                 _logger.LogInformation($"   Calculated Active Clients: {activeClients}");
 
                 // بررسی شرایط بار بالا
@@ -121,7 +121,7 @@ namespace SecureProcessor.Manager.API.Controllers
                     _logger.LogWarning($"   HIGH LOAD DETECTED #{requestNumber}");
                     _logger.LogWarning($"   Connected Clients ({_connectedClients}) > Threshold (15)");
 
-                    if (_connectedClients > 20)
+                    if (_connectedClients > 10)
                     {
                         isEnabled = false;
                         _logger.LogError($"   SYSTEM OVERLOADED #{requestNumber}");
