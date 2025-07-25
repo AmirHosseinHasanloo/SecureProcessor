@@ -6,4 +6,25 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
 
+  <ItemGroup>
+    <Compile Remove="Protos\Settings1.Designer.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Remove="Protos\Settings1.settings" />
+  </ItemGroup>
+
+	<ItemGroup>
+		<Protobuf Include="Protos\message_dispatcher.proto" GrpcServices="Both" />
+	</ItemGroup>
+
+	<ItemGroup>
+	  <PackageReference Include="Google.Protobuf" Version="3.31.1" />
+	  <PackageReference Include="Grpc.Core" Version="2.46.6" />
+	  <PackageReference Include="Grpc.Tools" Version="2.72.0">
+	    <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+	    <PrivateAssets>all</PrivateAssets>
+	  </PackageReference>
+	</ItemGroup>
+
 </Project>

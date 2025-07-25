@@ -1,0 +1,58 @@
+﻿syntax = "proto3";
+
+option csharp_namespace = "SecureProcessor.Shared.Protos";
+
+package message_dispatcher;
+
+// gRPC service definition
+service MessageDispatcher {
+  rpc Connect(stream ProcessorMessage) returns (stream DispatcherMessage);
+}
+
+// Message from processor to dispatcher
+message ProcessorMessage {
+  oneof content {
+    Introduction introduction = 1;
+    ResultMessage result = 2;
+  }
+}
+
+// Introduction message when processor connects
+message Introduction {
+  string id = 1;
+  string type = 2;
+}
+
+// Wrapper for map fields in ResultMessage
+message AdditionalFields {
+  map<string, bool> fields = 1;
+}
+
+// Result message after processing
+message ResultMessage {
+  int32 id = 1;
+  string engine = 2;
+  int32 message_length = 3;
+  bool is_valid = 4;
+  AdditionalFields additional_fields = 5;
+}
+
+// Wrapper for configuration map
+message Configuration {
+  map<string, string> rules = 1;
+}
+
+// Message from dispatcher to processor
+message DispatcherMessage {
+  oneof content {
+    Message message = 1;
+    Configuration config = 2;
+  }
+}
+
+// Raw message to be processed
+message Message {
+  int32 id = 1;
+  string sender = 2;
+  string content = 3;
+}

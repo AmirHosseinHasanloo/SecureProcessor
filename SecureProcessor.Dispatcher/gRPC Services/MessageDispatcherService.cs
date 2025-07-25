@@ -1,7 +1,9 @@
-﻿using Microsoft.Extensions.Logging;
+﻿using Grpc.Core;
+using Microsoft.Extensions.Logging;
 using SecureProcessor.Core.Services;
 using SecureProcessor.Dispatcher.Services;
 using SecureProcessor.Shared.Models;
+using SecureProcessor.Shared.Protos;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -74,9 +76,13 @@ namespace SecureProcessor.Dispatcher.gRPC_Services
             await _processorManager.RegisterProcessorAsync(introduction.Id, introduction.Type);
 
             // Send configuration to processor
+            var configuration = new Configuration();
+            configuration.Rules.Add("word_count", @"\b\w+\b");
+            configuration.Rules.Add("email", @"[\w\.-]+@[\w\.-]+\.\w+");
+
             var configMessage = new DispatcherMessage
             {
-                Config = { ["word_count"] = @"\b\w+\b", ["email"] = @"[\w\.-]+@[\w\.-]+\.\w+" }
+                Config = configuration
             };
 
             await responseStream.WriteAsync(configMessage);
@@ -91,7 +97,8 @@ namespace SecureProcessor.Dispatcher.gRPC_Services
                 Engine = result.Engine,
                 MessageLength = result.MessageLength,
                 IsValid = result.IsValid,
-                AdditionalFields = result.AdditionalFields.ToDictionary(kvp => kvp.Key, kvp => kvp.Value)
+                AdditionalFields = result.AdditionalFields?.Fields?.ToDictionary(kvp => kvp.Key, kvp => kvp.Value)
+                       ?? new Dictionary<string, bool>()
             };
 
             await _messageQueueService.SendProcessedMessageAsync(processedMessage);
