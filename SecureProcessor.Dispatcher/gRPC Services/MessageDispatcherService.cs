@@ -91,14 +91,22 @@ namespace SecureProcessor.Dispatcher.gRPC_Services
 
         private async Task HandleResultAsync(ResultMessage result)
         {
+            var additionalFields = new Dictionary<string, bool>();
+            if (result.AdditionalFields?.Fields != null)
+            {
+                foreach (var kvp in result.AdditionalFields.Fields)
+                {
+                    additionalFields[kvp.Key] = kvp.Value;
+                }
+            }
+
             var processedMessage = new ProcessedMessage
             {
                 Id = result.Id,
                 Engine = result.Engine,
                 MessageLength = result.MessageLength,
                 IsValid = result.IsValid,
-                AdditionalFields = result.AdditionalFields?.Fields?.ToDictionary(kvp => kvp.Key, kvp => kvp.Value)
-                       ?? new Dictionary<string, bool>()
+                AdditionalFields = additionalFields
             };
 
             await _messageQueueService.SendProcessedMessageAsync(processedMessage);
