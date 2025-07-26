@@ -1,65 +1,75 @@
 ﻿using Microsoft.Extensions.Logging;
+using SecureProcessor.Core.Services;
 using SecureProcessor.Shared.Models;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-
-namespace SecureProcessor.Core.Services
+using SecureProcessor.Shared.Protos;
+using System.Reflection;
+using Message = SecureProcessor.Shared.Models.Message;
+namespace SecureProcessor.Core.Services;
+/// <summary>
+/// Implementation of message queue service with external message support
+/// </summary>
+public class MessageQueueService : IMessageQueueService
 {
-    /// <summary>
-    /// Implementation of message queue service with simulation
-    /// </summary>
-    public class MessageQueueService : IMessageQueueService
+    private readonly Random _random = new();
+    private readonly ILogger<MessageQueueService> _logger;
+
+    public MessageQueueService(ILogger<MessageQueueService> logger)
     {
-        private readonly Random _random = new();
-        private readonly ILogger<MessageQueueService> _logger;
+        _logger = logger;
+    }
 
-        public MessageQueueService(ILogger<MessageQueueService> logger)
+    /// <summary>
+    /// Gets a message from the queue (prioritizes external messages)
+    /// </summary>
+    public async Task<Message> GetMessageAsync()
+    {
+
+
+        if (ExternalMessageQueue.TryDequeueExternalMessage(out var externalMessage))
         {
-            _logger = logger;
+            _logger.LogInformation($"📤 DEQUEUED EXTERNAL MESSAGE: {externalMessage.Message.Id}");
+            _logger.LogInformation($"   Request ID: {externalMessage.RequestId}");
+
+            return externalMessage.Message;
         }
 
-        /// <summary>
-        /// Simulates getting a message from queue with 200ms delay
-        /// </summary>
-        public async Task<Message> GetMessageAsync()
+        // اگر پیام خارجی نبود، پیام تصادفی تولید کن
+        await Task.Delay(200); // Simulate queue delay
+
+        var message = new Message
         {
-            await Task.Delay(200); // Simulate queue delay
+            Id = _random.Next(10000, 99999),
+            Sender = _random.Next(0, 2) == 0 ? "Legal" : "Finance",
+            Content = GenerateRandomContent()
+        };
 
-            var message = new Message
-            {
-                Id = _random.Next(1, 10000),
-                Sender = _random.Next(0, 2) == 0 ? "Legal" : "Finance",
-                Content = GenerateRandomContent()
-            };
+        _logger.LogInformation($"📤 GENERATED RANDOM MESSAGE: {message.Id}");
+        return message;
+    }
 
-            _logger.LogInformation($"Retrieved message {message.Id} from queue");
-            return message;
+    /// <summary>
+    /// Sends processed message to results queue (simulated with logging)
+    /// </summary>
+    public async Task SendProcessedMessageAsync(ProcessedMessage message)
+    {
+        await Task.CompletedTask; // Simulate async operation
+        _logger.LogInformation($"📥 SENT PROCESSED MESSAGE {message.Id} TO RESULTS QUEUE");
+        _logger.LogInformation($"   Engine: {message.Engine}");
+        _logger.LogInformation($"   Length: {message.MessageLength}");
+        _logger.LogInformation($"   Valid: {message.IsValid}");
+    }
+
+    private string GenerateRandomContent()
+    {
+        var words = new[] { "lorem", "ipsum", "dolor", "sit", "amet", "consectetur", "adipiscing", "elit" };
+        var content = new List<string>();
+
+        var wordCount = _random.Next(3, 10);
+        for (int i = 0; i < wordCount; i++)
+        {
+            content.Add(words[_random.Next(words.Length)]);
         }
 
-        /// <summary>
-        /// Simulates sending processed message to results queue
-        /// </summary>
-        public async Task SendProcessedMessageAsync(ProcessedMessage message)
-        {
-            await Task.CompletedTask; // Simulate async operation
-            _logger.LogInformation($"Sent processed message {message.Id} to results queue");
-        }
-
-        private string GenerateRandomContent()
-        {
-            var words = new[] { "lorem", "ipsum", "dolor", "sit", "amet", "consectetur", "adipiscing", "elit" };
-            var content = new List<string>();
-
-            var wordCount = _random.Next(3, 10);
-            for (int i = 0; i < wordCount; i++)
-            {
-                content.Add(words[_random.Next(words.Length)]);
-            }
-
-            return string.Join(" ", content);
-        }
+        return string.Join(" ", content);
     }
 }

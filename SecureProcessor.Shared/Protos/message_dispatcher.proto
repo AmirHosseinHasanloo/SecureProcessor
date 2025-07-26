@@ -4,12 +4,19 @@ option csharp_namespace = "SecureProcessor.Shared.Protos";
 
 package message_dispatcher;
 
-// gRPC service definition
-service MessageDispatcher {
+// سرویس ترکیبی برای همه عملیات
+service MessageDispatcherService {
+  // ارتباط دوطرفه با پردازش‌کننده‌ها
   rpc Connect(stream ProcessorMessage) returns (stream DispatcherMessage);
+  
+  // دریافت پیام خارجی
+  rpc SubmitExternalMessage(ExternalMessageRequest) returns (ExternalMessageResponse);
+  
+  // سلامت‌سنجی
+  rpc HealthCheck(HealthCheckRequest) returns (HealthCheckResponse);
 }
 
-// Message from processor to dispatcher
+// پیام‌های موجود (بدون تغییر)
 message ProcessorMessage {
   oneof content {
     Introduction introduction = 1;
@@ -17,18 +24,11 @@ message ProcessorMessage {
   }
 }
 
-// Introduction message when processor connects
 message Introduction {
   string id = 1;
   string type = 2;
 }
 
-// Wrapper for map fields in ResultMessage
-message AdditionalFields {
-  map<string, bool> fields = 1;
-}
-
-// Result message after processing
 message ResultMessage {
   int32 id = 1;
   string engine = 2;
@@ -37,12 +37,10 @@ message ResultMessage {
   AdditionalFields additional_fields = 5;
 }
 
-// Wrapper for configuration map
-message Configuration {
-  map<string, string> rules = 1;
+message AdditionalFields {
+  map<string, bool> fields = 1;
 }
 
-// Message from dispatcher to processor
 message DispatcherMessage {
   oneof content {
     Message message = 1;
@@ -50,9 +48,38 @@ message DispatcherMessage {
   }
 }
 
-// Raw message to be processed
+message Configuration {
+  map<string, string> rules = 1;
+}
+
 message Message {
   int32 id = 1;
   string sender = 2;
   string content = 3;
+}
+
+// پیام‌های جدید برای عملیات خارجی
+message ExternalMessageRequest {
+  string request_id = 1;
+  Message message = 2;
+  string requester_id = 3;
+  int64 request_time = 4;
+}
+
+message ExternalMessageResponse {
+  string status = 1;
+  string message = 2;
+  int64 response_time = 3;
+}
+
+message HealthCheckRequest {
+  string id = 1;
+  int64 system_time = 2;
+  int32 number_of_connected_clients = 3;
+}
+
+message HealthCheckResponse {
+  bool is_enabled = 1;
+  int32 number_of_active_clients = 2;
+  string expiration_time = 3; 
 }

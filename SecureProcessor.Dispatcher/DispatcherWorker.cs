@@ -15,7 +15,7 @@ public class DispatcherWorker : BackgroundService
     private readonly IMessageQueueService _messageQueueService;
     private readonly IProcessorManagerService _processorManager;
     private readonly DispatcherOptions _options;
-    private readonly MessageDispatcherService _grpcService;
+    private readonly MessageDispatcherServiceImpl _grpcService;
 
     public DispatcherWorker(
         ILogger<DispatcherWorker> logger,

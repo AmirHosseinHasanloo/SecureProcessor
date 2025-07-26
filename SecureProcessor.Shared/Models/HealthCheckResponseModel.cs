@@ -6,10 +6,10 @@ using System.Threading.Tasks;
 
 namespace SecureProcessor.Shared.Models
 {
-    public class SystemHealthStatus
+    public class HealthCheckResponseModel
     {
         public bool IsEnabled { get; set; }
-        public int ActiveClients { get; set; }
+        public int NumberOfActiveClients { get; set; }
         public DateTime ExpirationTime { get; set; }
     }
 }

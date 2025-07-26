@@ -4,21 +4,27 @@ using SecureProcessor.Core.Services;
 using SecureProcessor.Dispatcher.Services;
 using SecureProcessor.Shared.Models;
 using SecureProcessor.Shared.Protos;
+using System.Collections.Concurrent;
 
 namespace SecureProcessor.Dispatcher.gRPC_Services
 {
     /// <summary>
-    /// gRPC service for bidirectional communication with message processors
+    /// Unified gRPC service for all dispatcher operations
     /// </summary>
-    public class MessageDispatcherService : MessageDispatcher.MessageDispatcherBase
+    // ✅ تغییر نام کلاس برای جلوگیری از تداخل
+    public class MessageDispatcherServiceImpl : MessageDispatcherService.MessageDispatcherServiceBase
     {
         private readonly IMessageQueueService _messageQueueService;
         private readonly IProcessorManagerService _processorManager;
-        private readonly ILogger<MessageDispatcherService> _logger;
+        private readonly ILogger<MessageDispatcherServiceImpl> _logger;
 
-        public MessageDispatcherService(IMessageQueueService messageQueueService,
+        // صف داخلی برای پیام‌های خارجی
+        internal static readonly ConcurrentQueue<Shared.Models.ExternalMessageWrapper> ExternalMessages = new();
+        private static readonly object _queueLock = new object();
+
+        public MessageDispatcherServiceImpl(IMessageQueueService messageQueueService,
             IProcessorManagerService processorManager,
-            ILogger<MessageDispatcherService> logger)
+            ILogger<MessageDispatcherServiceImpl> logger)
         {
             _messageQueueService = messageQueueService;
             _processorManager = processorManager;
@@ -32,7 +38,7 @@ namespace SecureProcessor.Dispatcher.gRPC_Services
             IServerStreamWriter<DispatcherMessage> responseStream,
             ServerCallContext context)
         {
-            _logger.LogInformation("New processor connection established");
+            _logger.LogInformation("🔌 New processor connection established");
 
             // Handle incoming messages from processor
             var requestHandler = Task.Run(async () =>
@@ -53,20 +59,93 @@ namespace SecureProcessor.Dispatcher.gRPC_Services
                     }
                     catch (Exception ex)
                     {
-                        _logger.LogError(ex, "Error processing message from processor");
+                        _logger.LogError(ex, "❌ Error processing message from processor");
                     }
                 }
             });
 
             // Wait for the connection to be closed
             await requestHandler;
-            _logger.LogInformation("Processor connection closed");
+            _logger.LogInformation("🔌 Processor connection closed");
+        }
+
+        /// <summary>
+        /// دریافت پیام خارجی از Manager
+        /// </summary>
+        public override async Task<ExternalMessageResponse> SubmitExternalMessage(ExternalMessageRequest request, ServerCallContext context)
+        {
+            _logger.LogInformation($"📥 EXTERNAL MESSAGE RECEIVED: {request.RequestId}");
+            _logger.LogInformation($"   Message ID: {request.Message.Id}");
+
+            try
+            {
+                // اضافه کردن پیام به صف داخلی
+                var wrapper = new Shared.Models.ExternalMessageWrapper
+                {
+                    Message = new Shared.Models.Message
+                    {
+                        Id = request.Message.Id,
+                        Sender = request.Message.Sender,
+                        Content = request.Message.Content
+                    },
+                    RequestId = request.RequestId,
+                    RequesterId = request.RequesterId,
+                    ReceivedTime = DateTime.UtcNow
+                };
+
+                lock (_queueLock)
+                {
+                    ExternalMessages.Enqueue(wrapper);
+                }
+
+                _logger.LogInformation($"✅ EXTERNAL MESSAGE QUEUED: {request.RequestId}");
+
+                var response = new ExternalMessageResponse
+                {
+                    Status = "Queued",
+                    Message = "Message added to processing queue successfully",
+                    ResponseTime = DateTimeOffset.UtcNow.ToUnixTimeSeconds()
+                };
+
+                return await Task.FromResult(response);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "💥 ERROR QUEUING EXTERNAL MESSAGE");
+
+                return new ExternalMessageResponse
+                {
+                    Status = "Error",
+                    Message = $"Failed to queue message: {ex.Message}",
+                    ResponseTime = DateTimeOffset.UtcNow.ToUnixTimeSeconds()
+                };
+            }
+        }
+
+        /// <summary>
+        /// سلامت‌سنجی از طریق gRPC
+        /// </summary>
+        public override async Task<Shared.Protos.HealthCheckResponse> HealthCheck(Shared.Protos.HealthCheckRequest request, ServerCallContext context)
+        {
+            _logger.LogInformation($"🏥 HEALTH CHECK REQUEST: {request.Id}");
+            _logger.LogInformation($"   Connected Clients: {request.NumberOfConnectedClients}");
+
+            var response = new Shared.Protos.HealthCheckResponse
+            {
+                IsEnabled = true,
+                NumberOfActiveClients = Math.Min(request.NumberOfConnectedClients, 5),
+                ExpirationTime = DateTime.UtcNow.AddMinutes(10).ToString("o")
+            };
+
+            _logger.LogInformation($"✅ HEALTH CHECK RESPONSE: Active={response.NumberOfActiveClients}");
+
+            return await Task.FromResult(response);
         }
 
         private async Task HandleIntroductionAsync(Introduction introduction,
             IServerStreamWriter<DispatcherMessage> responseStream)
         {
-            _logger.LogInformation($"Processor introduced: {introduction.Id} ({introduction.Type})");
+            _logger.LogInformation($"👋 Processor introduced: {introduction.Id} ({introduction.Type})");
 
             await _processorManager.RegisterProcessorAsync(introduction.Id, introduction.Type);
 
@@ -81,7 +160,7 @@ namespace SecureProcessor.Dispatcher.gRPC_Services
             };
 
             await responseStream.WriteAsync(configMessage);
-            _logger.LogInformation($"Configuration sent to processor {introduction.Id}");
+            _logger.LogInformation($"⚙️ Configuration sent to processor {introduction.Id}");
         }
 
         private async Task HandleResultAsync(ResultMessage result)
@@ -105,7 +184,16 @@ namespace SecureProcessor.Dispatcher.gRPC_Services
             };
 
             await _messageQueueService.SendProcessedMessageAsync(processedMessage);
-            _logger.LogInformation($"Processed result received for message {result.Id}");
+            _logger.LogInformation($"✅ Processed result received for message {result.Id}");
         }
-    }
+
+
+        internal static int GetExternalMessageCount()
+        {
+            lock (_queueLock)
+            {
+                return ExternalMessages.Count;
+            }
+        }
+    } 
 }

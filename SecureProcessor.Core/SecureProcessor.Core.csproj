@@ -12,6 +12,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\SecureProcessor.Processor\SecureProcessor.Processor.csproj" />
     <ProjectReference Include="..\SecureProcessor.Shared\SecureProcessor.Shared.csproj" />
   </ItemGroup>
 

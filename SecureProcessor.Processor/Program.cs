@@ -21,14 +21,18 @@ class Program
         // Add services
         services.AddSingleton<IMessageProcessorService, MessageProcessorService>();
 
-        services.AddLogging();
+        // Add gRPC client - روش صحیح
+        services.AddSingleton<GrpcChannel>(provider =>
+        {
+            return GrpcChannel.ForAddress("https://localhost:5001");
+        });
 
-        // Create channel and client manually
-        var channel = GrpcChannel.ForAddress("https://localhost:5001");
-        services.AddSingleton(channel);
-
-        var client = new MessageDispatcher.MessageDispatcherClient(channel);
-        services.AddSingleton(client);
+        // Register gRPC client properly
+        services.AddSingleton<MessageDispatcherService.MessageDispatcherServiceClient>(provider =>
+        {
+            var channel = provider.GetRequiredService<GrpcChannel>();
+            return new MessageDispatcherService.MessageDispatcherServiceClient(channel);
+        });
 
         services.AddSingleton<ProcessorClientService>();
 
@@ -42,9 +46,8 @@ class Program
         }
         catch (Exception ex)
         {
-            var logger = serviceProvider.GetService<ILogger<Program>>();
-            logger?.LogError(ex, "Error in processor client");
             Console.WriteLine($"Error: {ex.Message}");
+            Console.WriteLine($"Inner Exception: {ex.InnerException?.Message}");
             Console.ReadLine();
         }
     }

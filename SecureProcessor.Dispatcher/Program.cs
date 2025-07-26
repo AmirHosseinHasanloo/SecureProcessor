@@ -1,4 +1,4 @@
-using Microsoft.AspNetCore.Builder;
+﻿using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using SecureProcessor.Core.Patterns.Options;
@@ -31,7 +31,8 @@ var app = builder.Build();
 app.UseRouting();
 
 // Map gRPC services
-app.MapGrpcService<MessageDispatcherService>();
+// ✅ تغییر نام کلاس
+app.MapGrpcService<MessageDispatcherServiceImpl>();
 
 // Optional: Add a default endpoint for browser testing
 app.MapGet("/", () => "Communication with gRPC endpoints must be made through a gRPC client.");

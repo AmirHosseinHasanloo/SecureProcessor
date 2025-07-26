@@ -14,12 +14,14 @@ namespace SecureProcessor.Processor.gRPC_Client
     /// </summary>
     public class ProcessorClientService
     {
-        private readonly Protos.MessageDispatcher.MessageDispatcherClient _client;
+        // ✅ استفاده از نام صحیح کلاینت
+        private readonly Protos.MessageDispatcherService.MessageDispatcherServiceClient _client;
         private readonly IMessageProcessorService _messageProcessor;
         private readonly ILogger<ProcessorClientService> _logger;
         private readonly string _processorId;
 
-        public ProcessorClientService(Protos.MessageDispatcher.MessageDispatcherClient client,
+        // ✅ تغییر نوع پارامتر
+        public ProcessorClientService(Protos.MessageDispatcherService.MessageDispatcherServiceClient client,
             IMessageProcessorService messageProcessor,
             ILogger<ProcessorClientService> logger)
         {
@@ -56,6 +58,7 @@ namespace SecureProcessor.Processor.gRPC_Client
             {
                 try
                 {
+                    // ✅ استفاده از DispatcherMessage به جای ProcessorMessage برای ContentCase
                     switch (message.ContentCase)
                     {
                         case Protos.DispatcherMessage.ContentOneofCase.Message:
@@ -63,6 +66,9 @@ namespace SecureProcessor.Processor.gRPC_Client
                             break;
                         case Protos.DispatcherMessage.ContentOneofCase.Config:
                             _logger.LogInformation("Configuration received from dispatcher");
+                            break;
+                        default:
+                            _logger.LogWarning($"Unknown message type: {message.ContentCase}");
                             break;
                     }
                 }
@@ -122,8 +128,7 @@ namespace SecureProcessor.Processor.gRPC_Client
 
         private string GenerateProcessorId()
         {
-            // Generate unique ID based on MAC address (simplified)
-            var macAddress = "AA:BB:CC:DD:EE:FF"; // In real scenario, get actual MAC
+            var macAddress = "AA:BB:CC:DD:EE:FF";
             return $"{Guid.NewGuid()}-{macAddress.GetHashCode():X}";
         }
     }
