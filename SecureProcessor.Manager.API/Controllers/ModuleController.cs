@@ -1,9 +1,10 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using Grpc.Net.Client;
+using Microsoft.AspNetCore.Mvc;
+using SecureProcessor.Shared.Extentions;
 using SecureProcessor.Shared.Models;
-using Grpc.Net.Client;
 using SecureProcessor.Shared.Protos;
-using Message = SecureProcessor.Shared.Protos.Message;
 using HealthCheckRequest = SecureProcessor.Shared.Protos.HealthCheckRequest;
+using Message = SecureProcessor.Shared.Protos.Message;
 
 namespace SecureProcessor.Manager.API.Controllers
 {
@@ -12,7 +13,6 @@ namespace SecureProcessor.Manager.API.Controllers
     public class ModuleController : ControllerBase
     {
         private readonly ILogger<ModuleController> _logger;
-
         public ModuleController(ILogger<ModuleController> logger)
         {
             _logger = logger;
@@ -22,19 +22,19 @@ namespace SecureProcessor.Manager.API.Controllers
         /// Health check endpoint - forwards to Dispatcher via gRPC
         /// </summary>
         [HttpPost("health")]
-        public async Task<IActionResult> HealthCheck([FromBody] HealthCheckRequestModel request)
+        public async Task<IActionResult> HealthCheck([FromBody] HealthCheckRequest request)
         {
-            _logger.LogInformation("🏥 HEALTH CHECK REQUEST RECEIVED");
+            _logger.LogInformation($"HEALTH CHECK REQUEST RECEIVED , Date : {DateToShamsi.ToShamsi(DateTime.UtcNow)}");
 
             if (request == null)
             {
-                _logger.LogError("❌ HEALTH CHECK FAILED: Request is NULL");
+                _logger.LogError("HEALTH CHECK FAILED: Request is NULL ");
                 return BadRequest("Request body is required");
             }
 
             if (string.IsNullOrEmpty(request.Id))
             {
-                _logger.LogWarning("⚠️ HEALTH CHECK WARNING: Missing Client ID");
+                _logger.LogWarning("HEALTH CHECK WARNING: Missing Client ID");
                 return BadRequest("Id is required");
             }
 
@@ -48,28 +48,28 @@ namespace SecureProcessor.Manager.API.Controllers
                 var grpcRequest = new HealthCheckRequest
                 {
                     Id = request.Id,
-                    SystemTime = DateTimeOffset.UtcNow.ToUnixTimeSeconds(),
+                    SystemTime = (int)DateTimeOffset.UtcNow.ToUnixTimeSeconds(),
                     NumberOfConnectedClients = request.NumberOfConnectedClients
                 };
 
-                _logger.LogInformation($"🔄 FORWARDING HEALTH CHECK TO DISPATCHER VIA gRPC");
+                _logger.LogInformation($"FORWARDING HEALTH CHECK TO DISPATCHER VIA gRPC , Date : {DateToShamsi.ToShamsi(DateTime.UtcNow)}");
 
                 var response = await client.HealthCheckAsync(grpcRequest);
 
-                var result = new HealthCheckResponseModel
+                var result = new Shared.Models.HealthCheckResponse
                 {
                     IsEnabled = response.IsEnabled,
                     NumberOfActiveClients = response.NumberOfActiveClients,
                     ExpirationTime = DateTime.UtcNow.AddMinutes(10)
                 };
 
-                _logger.LogInformation($"✅ HEALTH CHECK RESPONSE: Enabled={result.IsEnabled}, Active={result.NumberOfActiveClients}");
+                _logger.LogInformation($"HEALTH CHECK RESPONSE: Enabled={result.IsEnabled}, Active={result.NumberOfActiveClients}");
 
                 return Ok(result);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "💥 ERROR IN HEALTH CHECK");
+                _logger.LogError(ex, "ERROR IN HEALTH CHECK");
                 return StatusCode(500, $"Internal server error: {ex.Message}");
             }
         }
@@ -80,24 +80,24 @@ namespace SecureProcessor.Manager.API.Controllers
         [HttpPost("process-request")]
         public async Task<IActionResult> ProcessMessageRequest([FromBody] ProcessRequestModel request)
         {
-            _logger.LogInformation("📨 EXTERNAL PROCESS REQUEST RECEIVED");
-            _logger.LogInformation($"   Request ID: {request?.RequestId ?? "NULL"}");
+            _logger.LogInformation($"EXTERNAL PROCESS REQUEST RECEIVED Date : {DateToShamsi.ToShamsi(DateTime.UtcNow)}");
+            _logger.LogInformation($"Request ID: {request?.RequestId ?? "NULL"}");
 
             if (request == null)
             {
-                _logger.LogError("❌ PROCESS REQUEST FAILED: Request is NULL");
+                _logger.LogError($"PROCESS REQUEST FAILED: Request is NULL , Date : {DateToShamsi.ToShamsi(DateTime.UtcNow)}");
                 return BadRequest("Request body is required");
             }
 
             if (string.IsNullOrEmpty(request.RequestId))
             {
-                _logger.LogWarning("⚠️ PROCESS REQUEST WARNING: Missing Request ID");
+                _logger.LogWarning("PROCESS REQUEST WARNING: Missing Request ID");
                 return BadRequest("RequestId is required");
             }
 
             if (request.Message == null)
             {
-                _logger.LogWarning("⚠️ PROCESS REQUEST WARNING: Missing Message");
+                _logger.LogWarning("PROCESS REQUEST WARNING: Missing Message");
                 return BadRequest("Message is required");
             }
 
@@ -121,11 +121,11 @@ namespace SecureProcessor.Manager.API.Controllers
                     }
                 };
 
-                _logger.LogInformation($"🔄 SENDING MESSAGE TO DISPATCHER VIA gRPC");
+                _logger.LogInformation($"SENDING MESSAGE TO DISPATCHER VIA gRPC , Date : {DateToShamsi.ToShamsi(DateTime.UtcNow)}");
 
                 var response = await client.SubmitExternalMessageAsync(grpcRequest);
 
-                _logger.LogInformation($"✅ DISPATCHER RESPONSE RECEIVED");
+                _logger.LogInformation($"DISPATCHER RESPONSE RECEIVED");
                 _logger.LogInformation($"   Status: {response.Status}");
                 _logger.LogInformation($"   Message: {response.Message}");
 
@@ -140,7 +140,7 @@ namespace SecureProcessor.Manager.API.Controllers
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "💥 ERROR IN PROCESS REQUEST");
+                _logger.LogError(ex, "ERROR IN PROCESS REQUEST");
                 return StatusCode(500, $"Internal server error: {ex.Message}");
             }
         }
