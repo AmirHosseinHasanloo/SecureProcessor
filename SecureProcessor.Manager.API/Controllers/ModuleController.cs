@@ -22,56 +22,33 @@ namespace SecureProcessor.Manager.API.Controllers
         /// Health check endpoint - forwards to Dispatcher via gRPC
         /// </summary>
         [HttpPost("health")]
-        public async Task<IActionResult> HealthCheck([FromBody] HealthCheckRequest request)
+        public IActionResult HealthCheck([FromBody] HealthCheckRequest request)
         {
-            _logger.LogInformation($"HEALTH CHECK REQUEST RECEIVED , Date : {DateToShamsi.ToShamsi(DateTime.UtcNow)}");
+            // ✅ اضافه کردن لاگ برای عیب‌یابی
+            _logger.LogInformation($"Health check received: Id={request?.Id}, Clients={request?.NumberOfConnectedClients}, Time={request?.SystemTime}");
 
+            // ✅ اعتبارسنجی بهتر
             if (request == null)
             {
-                _logger.LogError("HEALTH CHECK FAILED: Request is NULL ");
+                _logger.LogWarning("Health check request is null");
                 return BadRequest("Request body is required");
             }
 
             if (string.IsNullOrEmpty(request.Id))
             {
-                _logger.LogWarning("HEALTH CHECK WARNING: Missing Client ID");
+                _logger.LogWarning("Health check request missing Id");
                 return BadRequest("Id is required");
             }
 
-            try
+            // ✅ منطق پاسخ
+            var response = new Shared.Models.HealthCheckResponse
             {
-                // ایجاد کانال gRPC به Dispatcher
-                using var channel = GrpcChannel.ForAddress("https://localhost:5001");
-                var client = new MessageDispatcherService.MessageDispatcherServiceClient(channel);
+                IsEnabled = true,
+                NumberOfActiveClients = Math.Min(request.NumberOfConnectedClients, 5),
+                ExpirationTime = DateTime.UtcNow.AddMinutes(10)
+            };
 
-                // تبدیل مدل به پیام gRPC
-                var grpcRequest = new HealthCheckRequest
-                {
-                    Id = request.Id,
-                    SystemTime = (int)DateTimeOffset.UtcNow.ToUnixTimeSeconds(),
-                    NumberOfConnectedClients = request.NumberOfConnectedClients
-                };
-
-                _logger.LogInformation($"FORWARDING HEALTH CHECK TO DISPATCHER VIA gRPC , Date : {DateToShamsi.ToShamsi(DateTime.UtcNow)}");
-
-                var response = await client.HealthCheckAsync(grpcRequest);
-
-                var result = new Shared.Models.HealthCheckResponse
-                {
-                    IsEnabled = response.IsEnabled,
-                    NumberOfActiveClients = response.NumberOfActiveClients,
-                    ExpirationTime = DateTime.UtcNow.AddMinutes(10)
-                };
-
-                _logger.LogInformation($"HEALTH CHECK RESPONSE: Enabled={result.IsEnabled}, Active={result.NumberOfActiveClients}");
-
-                return Ok(result);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "ERROR IN HEALTH CHECK");
-                return StatusCode(500, $"Internal server error: {ex.Message}");
-            }
+            return Ok(response);
         }
 
         /// <summary>

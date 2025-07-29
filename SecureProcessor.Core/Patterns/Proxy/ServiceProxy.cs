@@ -1,85 +1,75 @@
-﻿using Microsoft.Extensions.Logging;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+﻿// در ServiceProxy.cs
+using Microsoft.Extensions.Logging;
 using SecureProcessor.Core.Patterns.CircuitBreaker;
+using SecureProcessor.Core.Patterns.Proxy;
 
-namespace SecureProcessor.Core.Patterns.Proxy
+public class ServiceProxy<T> : IServiceProxy<T> where T : class
 {
-    /// <summary>
-    /// Implementation of service proxy with circuit breaker and retry patterns
-    /// </summary>
-    /// <typeparam name="T">Service contract type</typeparam>
-    public class ServiceProxy<T> : IServiceProxy<T> where T : class
+    // ✅ حذف وابستگی مستقیم به T
+    private readonly Func<T> _serviceFactory;
+    private readonly ICircuitBreaker _circuitBreaker;
+    private readonly ILogger<ServiceProxy<T>> _logger;
+
+    // ✅ استفاده از Factory Method به جای وابستگی مستقیم
+    public ServiceProxy(Func<T> serviceFactory, ICircuitBreaker circuitBreaker, ILogger<ServiceProxy<T>> logger)
     {
-        private readonly T _service;
-        private readonly ICircuitBreaker _circuitBreaker;
-        private readonly ILogger<ServiceProxy<T>> _logger;
+        _serviceFactory = serviceFactory ?? throw new ArgumentNullException(nameof(serviceFactory));
+        _circuitBreaker = circuitBreaker ?? throw new ArgumentNullException(nameof(circuitBreaker));
+        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+    }
 
-        public ServiceProxy(T service, ICircuitBreaker circuitBreaker, ILogger<ServiceProxy<T>> logger)
+    public async Task<TResult> InvokeAsync<TResult>(Func<T, Task<TResult>> operation,
+        int retryCount = 3,
+        TimeSpan retryDelay = default)
+    {
+        if (retryDelay == default)
+            retryDelay = TimeSpan.FromSeconds(1);
+
+        return await _circuitBreaker.ExecuteAsync(async () =>
         {
-            _service = service ?? throw new ArgumentNullException(nameof(service));
-            _circuitBreaker = circuitBreaker ?? throw new ArgumentNullException(nameof(circuitBreaker));
-            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-        }
-
-        /// <summary>
-        /// Executes a service operation with circuit breaker and retry logic
-        /// </summary>
-        public async Task<TResult> InvokeAsync<TResult>(Func<T, Task<TResult>> operation,
-            int retryCount = 3,
-            TimeSpan retryDelay = default)
-        {
-            if (retryDelay == default)
-                retryDelay = TimeSpan.FromSeconds(1);
-
-            return await _circuitBreaker.ExecuteAsync(async () =>
+            for (int attempt = 0; attempt <= retryCount; attempt++)
             {
-                for (int attempt = 0; attempt <= retryCount; attempt++)
+                try
                 {
-                    try
-                    {
-                        return await operation(_service);
-                    }
-                    catch (Exception ex) when (attempt < retryCount)
-                    {
-                        _logger.LogWarning($"Attempt {attempt + 1} failed: {ex.Message}. Retrying in {retryDelay.TotalSeconds}s...");
-                        await Task.Delay(retryDelay);
-                    }
+                    // ✅ ایجاد سرویس در هر تلاش
+                    var service = _serviceFactory();
+                    return await operation(service);
                 }
-                throw new InvalidOperationException("All retry attempts failed");
-            });
-        }
+                catch (Exception ex) when (attempt < retryCount)
+                {
+                    _logger.LogWarning($"Attempt {attempt + 1} failed: {ex.Message}. Retrying in {retryDelay.TotalSeconds}s...");
+                    await Task.Delay(retryDelay);
+                }
+            }
+            throw new InvalidOperationException("All retry attempts failed");
+        });
+    }
 
-        /// <summary>
-        /// Executes a service operation without return value with circuit breaker and retry logic
-        /// </summary>
-        public async Task InvokeAsync(Func<T, Task> operation,
-            int retryCount = 3,
-            TimeSpan retryDelay = default)
+    public async Task InvokeAsync(Func<T, Task> operation,
+        int retryCount = 3,
+        TimeSpan retryDelay = default)
+    {
+        if (retryDelay == default)
+            retryDelay = TimeSpan.FromSeconds(1);
+
+        await _circuitBreaker.ExecuteAsync(async () =>
         {
-            if (retryDelay == default)
-                retryDelay = TimeSpan.FromSeconds(1);
-
-            await _circuitBreaker.ExecuteAsync(async () =>
+            for (int attempt = 0; attempt <= retryCount; attempt++)
             {
-                for (int attempt = 0; attempt <= retryCount; attempt++)
+                try
                 {
-                    try
-                    {
-                        await operation(_service);
-                        return;
-                    }
-                    catch (Exception ex) when (attempt < retryCount)
-                    {
-                        _logger.LogWarning($"Attempt {attempt + 1} failed: {ex.Message}. Retrying in {retryDelay.TotalSeconds}s...");
-                        await Task.Delay(retryDelay);
-                    }
+                    // ✅ ایجاد سرویس در هر تلاش
+                    var service = _serviceFactory();
+                    await operation(service);
+                    return;
                 }
-                throw new InvalidOperationException("All retry attempts failed");
-            });
-        }
+                catch (Exception ex) when (attempt < retryCount)
+                {
+                    _logger.LogWarning($"Attempt {attempt + 1} failed: {ex.Message}. Retrying in {retryDelay.TotalSeconds}s...");
+                    await Task.Delay(retryDelay);
+                }
+            }
+            throw new InvalidOperationException("All retry attempts failed");
+        });
     }
 }
